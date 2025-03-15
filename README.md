@@ -1,6 +1,6 @@
 <a name="readme-top"></a>
 
-`@proj-airi/unplugin-live2d-sdk`
+# `@proj-airi/unplugin-live2d-sdk`
 
 Helper plugin for helping installing Live2D SDK.
 
