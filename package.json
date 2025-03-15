@@ -1,0 +1,74 @@
+{
+  "name": "@proj-airi/unplugin-live2d-sdk",
+  "type": "module",
+  "version": "1.0.0",
+  "packageManager": "pnpm@10.6.3",
+  "description": "Vite plugin to download Live2D SDK",
+  "author": {
+    "name": "Project AIRI Team",
+    "email": "airi-team@moeru.ai",
+    "url": "https://github.com/proj-airi"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/proj-airi/unplugin-live2d-sdk.git"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/vite/index.d.ts",
+      "import": "./dist/vite/index.mjs",
+      "require": "./dist/vite/index.cjs"
+    },
+    "./vite": {
+      "types": "./dist/vite/index.d.ts",
+      "import": "./dist/vite/index.mjs",
+      "node": "./dist/vite/index.cjs"
+    }
+  },
+  "main": "./dist/vite/index.cjs",
+  "module": "./dist/vite/index.mjs",
+  "types": "./dist/vite/index.d.ts",
+  "files": [
+    "README.md",
+    "dist",
+    "package.json"
+  ],
+  "scripts": {
+    "dev": "pnpm run stub",
+    "stub": "unbuild --stub",
+    "build": "unbuild",
+    "lint": "eslint --cache .",
+    "lint:fix": "eslint --cache --fix .",
+    "typecheck": "tsc --noEmit",
+    "up": "taze major -I",
+    "changelogithub": "changelogithub"
+  },
+  "dependencies": {
+    "ofetch": "^1.4.1",
+    "vite": "^6.2.2",
+    "yauzl": "^3.2.0"
+  },
+  "devDependencies": {
+    "@antfu/eslint-config": "^4.10.1",
+    "@antfu/ni": "^24.2.0",
+    "@types/node": "^22.13.10",
+    "@types/yauzl": "^2.10.3",
+    "bumpp": "^10.1.0",
+    "changelogithub": "^13.13.0",
+    "eslint": "^9.22.0",
+    "eslint-plugin-format": "^1.0.1",
+    "lint-staged": "^15.5.0",
+    "rollup": "^4.35.0",
+    "simple-git-hooks": "^2.11.1",
+    "taze": "^18.7.1",
+    "typescript": "~5.8.2",
+    "unbuild": "3.0.0-rc.11"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "simple-git-hooks"
+    ]
+  }
+}
