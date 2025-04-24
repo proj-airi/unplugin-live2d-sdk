@@ -2,7 +2,7 @@
   "name": "@proj-airi/unplugin-live2d-sdk",
   "type": "module",
   "version": "0.1.2",
-  "packageManager": "pnpm@10.8.1",
+  "packageManager": "pnpm@10.9.0",
   "description": "Vite plugin to download Live2D SDK",
   "author": {
     "name": "Project AIRI Team",
@@ -46,7 +46,7 @@
   },
   "dependencies": {
     "ofetch": "^1.4.1",
-    "vite": "^6.3.2",
+    "vite": "^6.3.3",
     "yauzl": "^3.2.0"
   },
   "devDependencies": {
@@ -56,11 +56,11 @@
     "@types/yauzl": "^2.10.3",
     "bumpp": "^10.1.0",
     "changelogithub": "^13.13.0",
-    "eslint": "^9.25.0",
+    "eslint": "^9.25.1",
     "eslint-plugin-format": "^1.0.1",
     "lint-staged": "^15.5.1",
     "rollup": "^4.40.0",
-    "simple-git-hooks": "^2.12.1",
+    "simple-git-hooks": "^2.13.0",
     "taze": "^19.0.4",
     "typescript": "^5.8.3",
     "unbuild": "^3.5.0"
