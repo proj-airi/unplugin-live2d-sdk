@@ -15,9 +15,9 @@ export function DownloadLive2DSDK(options?: {
     name: `download-live2d-cubism-sdk`,
     async configResolved(config) {
       const {
-        from = 'https://dist.ayaka.moe/npm/live2d-cubism/CubismSdkForWeb-5-r.1.zip',
+        from = 'https://cubism.live2d.com/sdk-web/bin/CubismSdkForWeb-5-r.3.zip',
       } = options || {
-        from: 'https://dist.ayaka.moe/npm/live2d-cubism/CubismSdkForWeb-5-r.1.zip',
+        from: 'https://cubism.live2d.com/sdk-web/bin/CubismSdkForWeb-5-r.3.zip',
       }
 
       const logger = createLogger()
@@ -27,7 +27,7 @@ export function DownloadLive2DSDK(options?: {
 
       try {
         // cache
-        if (!(await exists(resolve(join(cacheDir, 'assets', 'js', 'CubismSdkForWeb-5-r.1'))))) {
+        if (!(await exists(resolve(join(cacheDir, 'assets', 'js', 'CubismSdkForWeb-5-r.3'))))) {
           logger.info('Downloading Cubism SDK...')
           const stream = await ofetch(from, { responseType: 'arrayBuffer' })
 
@@ -38,11 +38,11 @@ export function DownloadLive2DSDK(options?: {
           logger.info('Cubism SDK downloaded and unzipped.')
         }
 
-        if (!(await exists(resolve(join(publicDir, 'assets', 'js', 'CubismSdkForWeb-5-r.1'))))) {
-          await mkdir(join(publicDir, 'assets', 'js', 'CubismSdkForWeb-5-r.1', 'Core'), { recursive: true }).catch(() => {})
+        if (!(await exists(resolve(join(publicDir, 'assets', 'js', 'CubismSdkForWeb-5-r.3'))))) {
+          await mkdir(join(publicDir, 'assets', 'js', 'CubismSdkForWeb-5-r.3', 'Core'), { recursive: true }).catch(() => {})
           await copyFile(
-            join(cacheDir, 'assets', 'js', 'CubismSdkForWeb-5-r.1', 'Core', 'live2dcubismcore.min.js'),
-            join(publicDir, 'assets', 'js', 'CubismSdkForWeb-5-r.1', 'Core', 'live2dcubismcore.min.js'),
+            join(cacheDir, 'assets', 'js', 'CubismSdkForWeb-5-r.3', 'Core', 'live2dcubismcore.min.js'),
+            join(publicDir, 'assets', 'js', 'CubismSdkForWeb-5-r.3', 'Core', 'live2dcubismcore.min.js'),
           )
         }
       }
