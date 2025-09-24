@@ -19,7 +19,7 @@ yarn i @proj-airi/unplugin-live2d-sdk -D
 npm i @proj-airi/unplugin-live2d-sdk -D
 ```
 
-### UnoCSS usage
+### Vite usage
 
 ```typescript
 import { DownloadLive2DSDK } from '@proj-airi/unplugin-live2d-sdk/vite'
