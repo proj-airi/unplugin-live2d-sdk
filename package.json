@@ -1,7 +1,7 @@
 {
   "name": "@proj-airi/unplugin-live2d-sdk",
   "type": "module",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "packageManager": "pnpm@10.33.0",
   "description": "Vite plugin to download Live2D SDK",
   "author": {
