@@ -32,6 +32,61 @@ export default defineConfig({
 })
 ```
 
+## Cubism 2 Core provisioning
+
+`Cubism2Core()` makes an explicitly supplied local Cubism 2 Core available to a Vite application. It has no default source and never downloads a Core:
+
+```typescript
+import { Cubism2Core } from '@proj-airi/unplugin-live2d-sdk/vite'
+import { defineConfig } from 'vite'
+
+export default defineConfig({
+  plugins: [
+    Cubism2Core({
+      sources: [
+        { path: './private/live2d.min.js', optional: true },
+        { path: 'C:/permitted-cores/live2d.min.js' },
+      ],
+    }),
+  ],
+})
+```
+
+Relative source paths resolve from Vite's final `root`; absolute paths remain absolute. Sources are checked in order. A missing optional source falls through, while a missing required source, unreadable file, or integrity mismatch fails configuration. With no sources, the plugin is optional and silent by default; set `required: true` to require configuration.
+
+Development serves the selected bytes from a content-addressed URL. The plugin computes SHA-256 and SRI even when no digest is configured. Restart the development server after changing the local Core file.
+
+Production emission is disabled by default. It must be enabled explicitly and requires the expected SHA-256:
+
+```typescript
+Cubism2Core({
+  distribution: 'bundle',
+  sources: [{
+    path: './private/live2d.min.js',
+    sha256: '<64 hexadecimal characters>',
+  }],
+})
+```
+
+Consumers can inspect the browser-safe capability:
+
+```typescript
+/// <reference types="@proj-airi/unplugin-live2d-sdk/types" />
+
+import { cubism2Core } from 'virtual:live2d-sdk/cores'
+
+if (cubism2Core.available)
+  console.info(cubism2Core.url, cubism2Core.sri)
+```
+
+The explicit types reference is temporarily required because the package's current unbuild entry does not automatically include ambient virtual-module declarations.
+
+> [!WARNING]
+>
+> Cubism Core is proprietary. Supply only bytes you are permitted to use. SHA-256 verifies identity and integrity but grants no license. `distribution: 'bundle'` places the Core in generated application artifacts, so maintainers must decide whether a release is permitted to redistribute it.
+
+Remote sources, network retries, archives, and a shared content-addressed cache are intentionally outside this first implementation.
+
 ## Other side projects born from Project AIRI
 
 - [Awesome AI VTuber](https://github.com/proj-airi/awesome-ai-vtuber): A curated list of AI VTubers and related projects
