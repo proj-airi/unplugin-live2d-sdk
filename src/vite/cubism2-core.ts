@@ -1,20 +1,43 @@
 import type { Plugin, ResolvedConfig } from 'vite'
 
-import { Buffer } from 'node:buffer'
-import { createHash, timingSafeEqual } from 'node:crypto'
-import { readFile } from 'node:fs/promises'
-import { isAbsolute, resolve } from 'node:path'
+import type {
+  Cubism2FileSource,
+  Cubism2Source,
+  Cubism2UrlSource,
+  Live2DSDKErrorCode,
+  SelectedCore,
+} from './core-source'
 
-export interface Cubism2CoreOptions {
-  sources?: readonly Cubism2FileSource[]
-  required?: boolean
-  distribution?: 'development-only' | 'bundle'
+import {
+
+  Live2DSDKError,
+  normalizeSha256Hex,
+  resolveCoreSource,
+
+  sha256Hex,
+  sha256Sri,
+  verifySha256,
+} from './core-source'
+
+export {
+  type Cubism2FileSource,
+  type Cubism2Source,
+  type Cubism2UrlSource,
+  Live2DSDKError,
+  type Live2DSDKErrorCode,
+  normalizeSha256Hex,
+  sha256Hex,
+  sha256Sri,
+  verifySha256,
 }
 
-export interface Cubism2FileSource {
-  path: string
-  sha256?: string
-  optional?: boolean
+export interface Cubism2CoreOptions {
+  sources?: readonly Cubism2Source[]
+  required?: boolean
+  distribution?: 'development-only' | 'bundle'
+  cacheDir?: string
+  timeout?: number
+  expectedGlobal?: string
 }
 
 export type Cubism2CoreCapability
@@ -23,7 +46,7 @@ export type Cubism2CoreCapability
     url: string
     sha256: string
     sri: string
-    expectedGlobal: 'Live2D'
+    expectedGlobal: string
     distribution: 'development' | 'bundle'
   }
   | {
@@ -31,58 +54,9 @@ export type Cubism2CoreCapability
     reason: 'not-configured' | 'not-found' | 'build-emission-disabled' | 'provisioning-failed'
   }
 
-export type Live2DSDKErrorCode
-  = | 'CORE_NOT_CONFIGURED'
-    | 'SOURCE_NOT_FOUND'
-    | 'SOURCE_UNREADABLE'
-    | 'INTEGRITY_REQUIRED'
-    | 'INTEGRITY_MISMATCH'
-    | 'BUILD_EMISSION_DISABLED'
-
-export class Live2DSDKError extends Error {
-  readonly code: Live2DSDKErrorCode
-
-  constructor(code: Live2DSDKErrorCode, message: string, options?: ErrorOptions) {
-    super(message, options)
-    this.name = 'Live2DSDKError'
-    this.code = code
-  }
-}
-
 const PUBLIC_ID = 'virtual:live2d-sdk/cores'
 const RESOLVED_ID = '\0virtual:live2d-sdk/cores'
 const DEVELOPMENT_ROUTE_PREFIX = '/@live2d-sdk/core/cubism2/'
-
-interface SelectedCore {
-  bytes: Uint8Array
-  path: string
-  configuredSha256?: string
-  sha256: string
-  sri: string
-}
-
-export function sha256Hex(bytes: Uint8Array): string {
-  return createHash('sha256').update(bytes).digest('hex')
-}
-
-export function sha256Sri(bytes: Uint8Array): string {
-  return `sha256-${createHash('sha256').update(bytes).digest('base64')}`
-}
-
-export function normalizeSha256Hex(value: string): string {
-  if (!/^[\da-f]{64}$/i.test(value)) {
-    throw new Live2DSDKError('INTEGRITY_MISMATCH', 'SHA-256 must contain exactly 64 hexadecimal characters.')
-  }
-  return value.toLowerCase()
-}
-
-export function verifySha256(bytes: Uint8Array, expectedHex: string): void {
-  const expected = Buffer.from(normalizeSha256Hex(expectedHex), 'hex')
-  const actual = createHash('sha256').update(bytes).digest()
-  if (!timingSafeEqual(actual, expected)) {
-    throw new Live2DSDKError('INTEGRITY_MISMATCH', 'Cubism 2 Core SHA-256 verification failed.')
-  }
-}
 
 function unavailable(reason: Extract<Cubism2CoreCapability, { available: false }>['reason']): Cubism2CoreCapability {
   return { available: false, reason }
@@ -101,48 +75,14 @@ function withBase(base: string, route: string): string {
   return `${base.endsWith('/') ? base.slice(0, -1) : base}${route}`
 }
 
-async function selectCore(config: ResolvedConfig, options: Cubism2CoreOptions): Promise<SelectedCore | undefined> {
-  const sources = options.sources ?? []
-  if (sources.length === 0) {
-    if (options.required)
-      throw new Live2DSDKError('CORE_NOT_CONFIGURED', 'Cubism 2 Core is required but no local source is configured.')
-    return
-  }
-
-  for (const source of sources) {
-    const sourcePath = isAbsolute(source.path) ? source.path : resolve(config.root, source.path)
-    let bytes: Uint8Array
-    try {
-      bytes = await readFile(sourcePath)
-    }
-    catch (cause) {
-      const error = cause as NodeJS.ErrnoException
-      if (error.code === 'ENOENT' && source.optional)
-        continue
-      if (error.code === 'ENOENT')
-        throw new Live2DSDKError('SOURCE_NOT_FOUND', 'Configured Cubism 2 Core source was not found.', { cause })
-      throw new Live2DSDKError('SOURCE_UNREADABLE', 'Configured Cubism 2 Core source could not be read.', { cause })
-    }
-
-    if (source.sha256)
-      verifySha256(bytes, source.sha256)
-
-    return {
-      bytes,
-      path: sourcePath,
-      configuredSha256: source.sha256 ? normalizeSha256Hex(source.sha256) : undefined,
-      sha256: sha256Hex(bytes),
-      sri: sha256Sri(bytes),
-    }
-  }
-}
-
 export function Cubism2Core(options: Cubism2CoreOptions = {}): Plugin {
   const normalized = {
     ...options,
     required: options.required ?? false,
     distribution: options.distribution ?? 'development-only',
+    expectedGlobal: options.expectedGlobal ?? 'Live2D',
   } as const
+
   let config: ResolvedConfig
   let selected: SelectedCore | undefined
   let capability: Cubism2CoreCapability = unavailable('not-configured')
@@ -152,9 +92,24 @@ export function Cubism2Core(options: Cubism2CoreOptions = {}): Plugin {
     name: 'proj-airi:cubism2-core',
     async configResolved(resolvedConfig) {
       config = resolvedConfig
-      selected = await selectCore(config, normalized)
+
+      const hasSources = (normalized.sources?.length ?? 0) > 0
+
+      if (!hasSources && !normalized.required) {
+        capability = unavailable('not-configured')
+        return
+      }
+
+      selected = await resolveCoreSource({
+        sources: normalized.sources ?? [],
+        required: normalized.required,
+        cacheDir: normalized.cacheDir,
+        timeout: normalized.timeout,
+        viteRoot: config.root,
+      })
+
       if (!selected) {
-        capability = unavailable((normalized.sources?.length ?? 0) > 0 ? 'not-found' : 'not-configured')
+        capability = unavailable(hasSources ? 'not-found' : 'not-configured')
         return
       }
 
@@ -168,7 +123,7 @@ export function Cubism2Core(options: Cubism2CoreOptions = {}): Plugin {
         url: withBase(config.base, `${DEVELOPMENT_ROUTE_PREFIX}${selected.sha256}.js`),
         sha256: selected.sha256,
         sri: selected.sri,
-        expectedGlobal: 'Live2D',
+        expectedGlobal: normalized.expectedGlobal,
         distribution: config.command === 'build' ? 'bundle' : 'development',
       }
     },
@@ -177,7 +132,15 @@ export function Cubism2Core(options: Cubism2CoreOptions = {}): Plugin {
         return
       if (!selected.configuredSha256)
         throw new Live2DSDKError('INTEGRITY_REQUIRED', 'Production Cubism 2 Core emission requires a configured SHA-256 digest.')
-      this.addWatchFile(selected.path)
+      // Add watch file only if it was a file source
+      // In the new architecture, SelectedCore could track source type, or we could just watch if it's a file.
+      // But wait, the requirements state: "Registers the selected source as a watched file (if it's a file)".
+      // Let's check the old implementation: `this.addWatchFile(selected.path)`.
+      // We removed `path` from `SelectedCore`. Let's add `path?: string` to `SelectedCore` in `core-source.ts`.
+      // For now, I'll update it below.
+      if (selected.path) {
+        this.addWatchFile(selected.path)
+      }
       assetReference = this.emitFile({
         type: 'asset',
         name: 'live2d-cubism2-core.js',
@@ -218,4 +181,8 @@ export function Cubism2Core(options: Cubism2CoreOptions = {}): Plugin {
       })
     },
   }
+}
+
+declare module 'virtual:live2d-sdk/cores' {
+  export const cubism2Core: Cubism2CoreCapability
 }

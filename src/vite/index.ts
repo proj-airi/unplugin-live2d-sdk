@@ -1,3 +1,5 @@
+/// <reference path="./cores.d.ts" />
+
 import type { Plugin } from 'vite'
 
 import { Buffer } from 'node:buffer'
@@ -10,7 +12,7 @@ import { createLogger } from 'vite'
 import { exists, unzip } from '../utils'
 
 export { Cubism2Core } from './cubism2-core'
-export type { Cubism2CoreCapability, Cubism2CoreOptions, Cubism2FileSource } from './cubism2-core'
+export type { Cubism2CoreCapability, Cubism2CoreOptions, Cubism2FileSource, Cubism2Source, Cubism2UrlSource } from './cubism2-core'
 
 export function DownloadLive2DSDK(options?: {
   from?: string
