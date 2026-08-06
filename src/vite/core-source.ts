@@ -1,6 +1,6 @@
 import { Buffer } from 'node:buffer'
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname, isAbsolute, resolve } from 'node:path'
 
 export interface Cubism2FileSource {
@@ -42,6 +42,7 @@ export type Live2DSDKErrorCode
     | 'INTEGRITY_REQUIRED'
     | 'INTEGRITY_MISMATCH'
     | 'BUILD_EMISSION_DISABLED'
+    | 'DUPLICATE_PLUGIN'
 
 export class Live2DSDKError extends Error {
   readonly code: Live2DSDKErrorCode
@@ -77,15 +78,25 @@ export function verifySha256(bytes: Uint8Array, expectedHex: string): void {
 }
 
 async function safeWriteCache(cachePath: string, bytes: Uint8Array): Promise<void> {
+  let tempPath: string | undefined
   try {
     await mkdir(dirname(cachePath), { recursive: true })
-    const tempPath = `${cachePath}.${randomBytes(16).toString('hex')}.tmp`
+    tempPath = `${cachePath}.${randomBytes(16).toString('hex')}.tmp`
     await writeFile(tempPath, bytes)
     await rename(tempPath, cachePath)
+    tempPath = undefined
   }
   catch (error) {
     console.warn(`[Live2D SDK] Failed to write cache to ${cachePath}:`, error)
   }
+  finally {
+    if (tempPath)
+      await rm(tempPath, { force: true }).catch(() => {})
+  }
+}
+
+function timeoutError(): Live2DSDKError {
+  return new Live2DSDKError('SOURCE_TIMEOUT', 'Cubism 2 Core download timed out.')
 }
 
 export async function resolveCoreSource(options: CoreSourceOptions): Promise<SelectedCore | undefined> {
@@ -122,72 +133,42 @@ export async function resolveCoreSource(options: CoreSourceOptions): Promise<Sel
         sri: sha256Sri(bytes),
       }
     }
-    else if ('url' in source) {
-      const expectedSha256 = normalizeSha256Hex(source.sha256)
-      let cachePath: string | undefined
-      if (options.cacheDir) {
-        cachePath = resolve(options.viteRoot, options.cacheDir, expectedSha256)
-        try {
-          const cachedBytes = await readFile(cachePath)
-          verifySha256(cachedBytes, expectedSha256)
-          return {
-            bytes: cachedBytes,
-            configuredSha256: expectedSha256,
-            sha256: expectedSha256,
-            sri: sha256Sri(cachedBytes),
-          }
-        }
-        catch {
-          // Cache miss, unreadable, or corrupt. Fall through to network request.
-        }
-      }
 
-      const controller = new AbortController()
-      let timeoutId: NodeJS.Timeout | undefined
-      if (options.timeout !== undefined) {
-        timeoutId = setTimeout(() => controller.abort(new Live2DSDKError('SOURCE_TIMEOUT', 'Download timed out')), options.timeout)
-      }
-
-      let response: Response | undefined
+    const expectedSha256 = normalizeSha256Hex(source.sha256)
+    let cachePath: string | undefined
+    if (options.cacheDir) {
+      cachePath = resolve(options.viteRoot, options.cacheDir, expectedSha256)
       try {
-        response = await fetch(source.url, { signal: controller.signal })
-      }
-      catch (cause) {
-        if (timeoutId)
-          clearTimeout(timeoutId)
-        if (controller.signal.aborted && controller.signal.reason instanceof Live2DSDKError) {
-          if (source.optional)
-            continue
-          throw controller.signal.reason
+        const cachedBytes = await readFile(cachePath)
+        verifySha256(cachedBytes, expectedSha256)
+        return {
+          bytes: cachedBytes,
+          configuredSha256: expectedSha256,
+          sha256: expectedSha256,
+          sri: sha256Sri(cachedBytes),
         }
-        if (source.optional)
-          continue
-        throw new Live2DSDKError('SOURCE_UNREACHABLE', 'Configured URL source unreachable.', { cause })
       }
-
-      if (timeoutId)
-        clearTimeout(timeoutId)
-
-      if (!response) {
-        if (controller.signal.aborted && controller.signal.reason instanceof Live2DSDKError) {
-          if (source.optional)
-            continue
-          throw controller.signal.reason
-        }
-        if (source.optional)
-          continue
-        throw new Live2DSDKError('SOURCE_UNREACHABLE', 'Configured URL source unreachable.')
+      catch {
+        // Cache miss, unreadable entry, or digest mismatch. Reacquire verified bytes.
       }
+    }
 
+    const controller = new AbortController()
+    const timeoutId = options.timeout === undefined
+      ? undefined
+      : setTimeout(() => controller.abort(timeoutError()), options.timeout)
+
+    try {
+      const response = await fetch(source.url, { signal: controller.signal })
       if (!response.ok) {
         if (source.optional)
           continue
         throw new Live2DSDKError('SOURCE_UNREACHABLE', `HTTP ${response.status} from URL source.`)
       }
 
-      const arrayBuffer = await response.arrayBuffer()
-      const bytes = new Uint8Array(arrayBuffer)
-
+      // Keep the abort timer alive through the body read. Resolving response
+      // headers does not prove that the Core bytes will finish downloading.
+      const bytes = new Uint8Array(await response.arrayBuffer())
       try {
         verifySha256(bytes, expectedSha256)
       }
@@ -195,9 +176,8 @@ export async function resolveCoreSource(options: CoreSourceOptions): Promise<Sel
         throw new Live2DSDKError('INTEGRITY_MISMATCH', 'Downloaded bytes do not match mandatory SHA-256.', { cause })
       }
 
-      if (cachePath) {
+      if (cachePath)
         await safeWriteCache(cachePath, bytes)
-      }
 
       return {
         bytes,
@@ -206,6 +186,29 @@ export async function resolveCoreSource(options: CoreSourceOptions): Promise<Sel
         sri: sha256Sri(bytes),
       }
     }
+    catch (cause) {
+      if (controller.signal.aborted && controller.signal.reason instanceof Live2DSDKError) {
+        if (source.optional)
+          continue
+        throw controller.signal.reason
+      }
+      if (cause instanceof Live2DSDKError)
+        throw cause
+      if (source.optional)
+        continue
+      throw new Live2DSDKError('SOURCE_UNREACHABLE', 'Configured URL source could not be downloaded.', { cause })
+    }
+    finally {
+      if (timeoutId)
+        clearTimeout(timeoutId)
+    }
+  }
+
+  if (options.required) {
+    throw new Live2DSDKError(
+      'CORE_NOT_CONFIGURED',
+      'Cubism 2 Core is required but none of the configured sources could be resolved.',
+    )
   }
 
   return undefined

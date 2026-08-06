@@ -10,6 +10,7 @@
 .vite-inspect
 *.local
 *.log
+*.tgz
 components.d.ts
 **/typed-router.d.ts
 dist

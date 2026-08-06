@@ -9,11 +9,9 @@ import type {
 } from './core-source'
 
 import {
-
   Live2DSDKError,
   normalizeSha256Hex,
   resolveCoreSource,
-
   sha256Hex,
   sha256Sri,
   verifySha256,
@@ -51,12 +49,13 @@ export type Cubism2CoreCapability
   }
   | {
     available: false
-    reason: 'not-configured' | 'not-found' | 'build-emission-disabled' | 'provisioning-failed'
+    reason: 'not-configured' | 'not-found' | 'build-emission-disabled'
   }
 
 const PUBLIC_ID = 'virtual:live2d-sdk/cores'
 const RESOLVED_ID = '\0virtual:live2d-sdk/cores'
 const DEVELOPMENT_ROUTE_PREFIX = '/@live2d-sdk/core/cubism2/'
+const configuredViteInstances = new WeakSet<ResolvedConfig>()
 
 function unavailable(reason: Extract<Cubism2CoreCapability, { available: false }>['reason']): Cubism2CoreCapability {
   return { available: false, reason }
@@ -91,10 +90,16 @@ export function Cubism2Core(options: Cubism2CoreOptions = {}): Plugin {
   return {
     name: 'proj-airi:cubism2-core',
     async configResolved(resolvedConfig) {
+      if (configuredViteInstances.has(resolvedConfig)) {
+        throw new Live2DSDKError(
+          'DUPLICATE_PLUGIN',
+          'Cubism2Core() may only be registered once in a Vite configuration.',
+        )
+      }
+      configuredViteInstances.add(resolvedConfig)
       config = resolvedConfig
 
       const hasSources = (normalized.sources?.length ?? 0) > 0
-
       if (!hasSources && !normalized.required) {
         capability = unavailable('not-configured')
         return
@@ -132,15 +137,8 @@ export function Cubism2Core(options: Cubism2CoreOptions = {}): Plugin {
         return
       if (!selected.configuredSha256)
         throw new Live2DSDKError('INTEGRITY_REQUIRED', 'Production Cubism 2 Core emission requires a configured SHA-256 digest.')
-      // Add watch file only if it was a file source
-      // In the new architecture, SelectedCore could track source type, or we could just watch if it's a file.
-      // But wait, the requirements state: "Registers the selected source as a watched file (if it's a file)".
-      // Let's check the old implementation: `this.addWatchFile(selected.path)`.
-      // We removed `path` from `SelectedCore`. Let's add `path?: string` to `SelectedCore` in `core-source.ts`.
-      // For now, I'll update it below.
-      if (selected.path) {
+      if (selected.path)
         this.addWatchFile(selected.path)
-      }
       assetReference = this.emitFile({
         type: 'asset',
         name: 'live2d-cubism2-core.js',
@@ -181,8 +179,4 @@ export function Cubism2Core(options: Cubism2CoreOptions = {}): Plugin {
       })
     },
   }
-}
-
-declare module 'virtual:live2d-sdk/cores' {
-  export const cubism2Core: Cubism2CoreCapability
 }

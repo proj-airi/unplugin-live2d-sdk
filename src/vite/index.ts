@@ -1,4 +1,4 @@
-/// <reference path="./cores.d.ts" />
+/// <reference path="../../types/cores.d.ts" />
 
 import type { Plugin } from 'vite'
 
@@ -32,7 +32,6 @@ export function DownloadLive2DSDK(options?: {
       const publicDir = resolve(join(config.root, 'public'))
 
       try {
-        // cache
         if (!(await exists(resolve(join(cacheDir, 'assets', 'js', 'CubismSdkForWeb-5-r.3'))))) {
           logger.info('Downloading Cubism SDK...')
           const stream = await ofetch(from, { responseType: 'arrayBuffer' })
