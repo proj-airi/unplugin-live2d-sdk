@@ -1,3 +1,5 @@
+/// <reference path="../../types/cores.d.ts" />
+
 import type { Plugin } from 'vite'
 
 import { Buffer } from 'node:buffer'
@@ -8,6 +10,9 @@ import { ofetch } from 'ofetch'
 import { createLogger } from 'vite'
 
 import { exists, unzip } from '../utils'
+
+export { Cubism2Core } from './cubism2-core'
+export type { Cubism2CoreCapability, Cubism2CoreOptions, Cubism2FileSource, Cubism2Source, Cubism2UrlSource } from './cubism2-core'
 
 export function DownloadLive2DSDK(options?: {
   from?: string
@@ -27,7 +32,6 @@ export function DownloadLive2DSDK(options?: {
       const publicDir = resolve(join(config.root, 'public'))
 
       try {
-        // cache
         if (!(await exists(resolve(join(cacheDir, 'assets', 'js', 'CubismSdkForWeb-5-r.3'))))) {
           logger.info('Downloading Cubism SDK...')
           const stream = await ofetch(from, { responseType: 'arrayBuffer' })

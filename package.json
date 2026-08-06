@@ -24,6 +24,9 @@
       "types": "./dist/vite/index.d.ts",
       "import": "./dist/vite/index.mjs",
       "node": "./dist/vite/index.cjs"
+    },
+    "./types": {
+      "types": "./types/cores.d.ts"
     }
   },
   "main": "./dist/vite/index.cjs",
@@ -32,12 +35,15 @@
   "files": [
     "README.md",
     "dist",
-    "package.json"
+    "package.json",
+    "types"
   ],
   "scripts": {
     "dev": "pnpm run stub",
     "stub": "unbuild --stub",
     "build": "unbuild",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "lint": "eslint --cache .",
     "lint:fix": "eslint --cache --fix .",
     "typecheck": "tsc --noEmit",
@@ -63,7 +69,8 @@
     "simple-git-hooks": "^2.13.1",
     "taze": "^19.11.0",
     "typescript": "^6.0.2",
-    "unbuild": "^3.6.1"
+    "unbuild": "^3.6.1",
+    "vitest": "^4.0.18"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

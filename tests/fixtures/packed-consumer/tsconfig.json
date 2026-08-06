@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "types": [
+      "@proj-airi/unplugin-live2d-sdk/types",
+      "node"
+    ]
+  },
+  "include": [
+    "src.ts"
+  ]
+}
